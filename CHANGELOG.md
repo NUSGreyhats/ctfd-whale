@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-05-09 Security Patch
+
+- Fix rate limiting bypass: the 60-second cooldown was stored in the session cookie, so clearing cookies or using incognito bypassed it entirely. The Redis lock is now properly released on early aborts and wrapped in try/finally to guarantee release on exceptions.
+- Fix race condition in FilesystemCacheProvider port/network allocation: concurrent requests could receive the same port, routing one competitor's traffic to another's container. All get/pop/set sequences are now protected by a threading lock, and per-user and global locks are properly implemented instead of no-op stubs.
+- Fix missing challenge type validation: competitors could request container creation for non-docker challenges, causing unhandled exceptions that destroyed their existing running container and leaked stack traces. The challenge_visible decorator now rejects non-docker challenges.
+- Fix timing side-channel on flag comparison: Python's `==` short-circuits on the first mismatched byte, leaking flag characters via response time differences. Flag comparison now uses `hmac.compare_digest()`.
+- Fix remaining time calculation: `timedelta.seconds` only returns the seconds component (0-86399), ignoring the days component. Replaced with `total_seconds()` to prevent expired containers from appearing valid.
+- Fix path traversal in admin template include: the `view_mode` query parameter was used directly in a Jinja2 `{% include %}` path with no validation. Now restricted to an allowlist of `list` and `card`.
+
 ## 2020-03-18
 
 - Allow non-dynamic flag.
