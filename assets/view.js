@@ -13,6 +13,11 @@ CTFd._internal.challenge.postRender = function () {
 
 if (window.$ === undefined) window.$ = CTFd.lib.$;
 
+function htmlentities(str) {
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function loadInfo() {
     var challenge_id = CTFd._internal.challenge.data.id;
     var url = "/api/v1/plugins/ctfd-whale/container?challenge_id=" + challenge_id;
@@ -42,12 +47,12 @@ function loadInfo() {
         if (response.success) response = response.data;
         else CTFd._functions.events.eventAlert({
             title: "Fail",
-            html: response.message,
+            html: htmlentities(response.message),
             button: "OK"
         });
         if (response.remaining_time != undefined) {
             $('#whale-challenge-user-access').html(response.user_access);
-            $('#whale-challenge-lan-domain').html(response.lan_domain);
+            $('#whale-challenge-lan-domain').text(response.lan_domain);
             $('#whale-challenge-count-down').text(response.remaining_time);
             $('#whale-panel-stopped').hide();
             $('#whale-panel-started').show();
@@ -106,7 +111,7 @@ CTFd._internal.challenge.destroy = function () {
         } else {
             CTFd._functions.events.eventAlert({
                 title: "Fail",
-                html: response.message,
+                html: htmlentities(response.message),
                 button: "OK"
             });
         }
@@ -154,7 +159,7 @@ CTFd._internal.challenge.renew = function () {
         } else {
             CTFd._functions.events.eventAlert({
                 title: "Fail",
-                html: response.message,
+                html: htmlentities(response.message),
                 button: "OK"
             });
         }
@@ -202,7 +207,7 @@ CTFd._internal.challenge.boot = function () {
         } else {
             CTFd._functions.events.eventAlert({
                 title: "Fail",
-                html: response.message,
+                html: htmlentities(response.message),
                 button: "OK"
             });
         }

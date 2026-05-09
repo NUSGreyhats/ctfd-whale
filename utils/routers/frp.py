@@ -108,18 +108,18 @@ class FrpRouter(BaseRouter):
         return True, 'success'
 
     def unregister(self, container: WhaleContainer):
-        if container.challenge.redirect_type == 'direct':
+        self.reload(exclude=container.uuid)
+        if container.challenge.redirect_type == 'direct' and container.port:
             try:
                 redis_util = CacheProvider(app=current_app)
                 redis_util.add_available_port(container.port)
             except Exception as e:
                 logging.log(
-                    'whale', 'Error deleting port from cache',
+                    'whale', 'Error returning port to cache',
                     name=container.user.name,
                     challenge_id=container.challenge_id,
                 )
-                return False, 'Error deleting port from cache'
-        self.reload(exclude=container.uuid)
+                return False, 'Error returning port to cache'
         return True, 'success'
 
     def check_availability(self):

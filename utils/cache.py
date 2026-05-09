@@ -1,5 +1,6 @@
 import ipaddress
 import threading
+import time
 import warnings
 from CTFd.cache import cache
 from CTFd.utils import get_config
@@ -137,6 +138,15 @@ class FilesystemCacheProvider:
         except RuntimeError:
             return False
 
+    def acquire_cooldown(self, key, seconds):
+        now = int(time.time())
+        with self._lock:
+            expires_at = cache.get(key)
+            if expires_at and int(expires_at) > now:
+                return False, int(expires_at) - now
+            cache.set(key, now + seconds, timeout=seconds)
+            return True, 0
+
 
 class RedisCacheProvider(FlaskRedis):
     _GLOBAL_CONTAINER_LOCK = 'ctfd_whale_global_container_lock'
@@ -186,7 +196,7 @@ class RedisCacheProvider(FlaskRedis):
             return False
 
     def acquire_global_lock(self):
-        lock = self.lock(name=self._GLOBAL_CONTAINER_LOCK, timeout=10)
+        lock = self.lock(name=self._GLOBAL_CONTAINER_LOCK, timeout=120)
         if not lock.acquire(blocking=True, blocking_timeout=5.0):
             return False
         self._global_lock = lock
@@ -200,3 +210,10 @@ class RedisCacheProvider(FlaskRedis):
             return True
         except LockError:
             return False
+
+    def acquire_cooldown(self, key, seconds):
+        expires_at = int(time.time()) + seconds
+        if self.set(key, expires_at, ex=seconds, nx=True):
+            return True, 0
+        remaining = self.ttl(key)
+        return False, max(int(remaining), 0)

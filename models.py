@@ -1,12 +1,33 @@
 import random
+import re
 import uuid
 from datetime import datetime
 
-from jinja2 import Template
+from jinja2.sandbox import SandboxedEnvironment
 
 from CTFd.utils import get_config
 from CTFd.models import db
 from CTFd.plugins.dynamic_challenges import DynamicChallenge
+
+from .utils.exceptions import WhaleError
+
+
+_TEMPLATE_ENV = SandboxedEnvironment(autoescape=False)
+_SUBDOMAIN_RE = re.compile(r"^(?=.{1,63}$)[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
+
+
+def _render_template(source, **context):
+    return _TEMPLATE_ENV.from_string(source).render(**context)
+
+
+def _validate_subdomain(subdomain):
+    subdomain = str(subdomain).strip().lower()
+    if not _SUBDOMAIN_RE.fullmatch(subdomain):
+        raise WhaleError(
+            "Invalid rendered subdomain. Use only letters, digits and dashes; "
+            "it must be 1-63 characters and must not start or end with a dash."
+        )
+    return subdomain
 
 
 class WhaleConfig(db.Model):
@@ -55,12 +76,16 @@ class DynamicDockerChallenge(DynamicChallenge):
 
 
 class WhaleContainer(db.Model):
+    STATUS_CREATING = 0
+    STATUS_RUNNING = 1
+    STATUS_REMOVING = 2
+
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     user_id = db.Column(None, db.ForeignKey("users.id"))
     challenge_id = db.Column(None, db.ForeignKey("challenges.id"))
     start_time = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     renew_count = db.Column(db.Integer, nullable=False, default=0)
-    status = db.Column(db.Integer, default=1)
+    status = db.Column(db.Integer, default=STATUS_CREATING)
     uuid = db.Column(db.String(256))
     port = db.Column(db.Integer, nullable=True, default=0)
     flag = db.Column(db.String(128), nullable=False)
@@ -74,31 +99,35 @@ class WhaleContainer(db.Model):
 
     @property
     def http_subdomain(self):
-        return Template(get_config(
+        rendered = _render_template(get_config(
             'whale:template_http_subdomain', '{{ container.uuid }}'
-        )).render(container=self)
+        ), container=self)
+        return _validate_subdomain(rendered)
 
     def __init__(self, user_id, challenge_id):
         self.user_id = user_id
         self.challenge_id = challenge_id
         self.start_time = datetime.now()
         self.renew_count = 0
+        self.status = self.STATUS_CREATING
         self.uuid = str(uuid.uuid4())
-        self.flag = Template(get_config(
+        self.flag = _render_template(get_config(
             'whale:template_chall_flag', '{{ "flag{"+uuid.uuid4()|string+"}" }}'
-        )).render(container=self, uuid=uuid, random=random, get_config=get_config)
+        ), container=self, uuid=uuid, random=random, get_config=get_config).strip()
+        if len(self.flag) > 128:
+            raise WhaleError('Rendered flag is too long (maximum 128 characters)')
 
     @property
     def user_access(self):
-        return Template(WhaleRedirectTemplate.query.filter_by(
+        return _render_template(WhaleRedirectTemplate.query.filter_by(
             key=self.challenge.redirect_type
-        ).first().access_template).render(container=self, get_config=get_config)
+        ).first().access_template, container=self, get_config=get_config)
 
     @property
     def frp_config(self):
-        return Template(WhaleRedirectTemplate.query.filter_by(
+        return _render_template(WhaleRedirectTemplate.query.filter_by(
             key=self.challenge.redirect_type
-        ).first().frp_template).render(container=self, get_config=get_config)
+        ).first().frp_template, container=self, get_config=get_config)
 
     def __repr__(self):
         return "<WhaleContainer ID:{0} {1} {2} {3} {4}>".format(self.id, self.user_id, self.challenge_id,

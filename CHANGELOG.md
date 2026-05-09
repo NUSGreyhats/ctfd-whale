@@ -2,12 +2,22 @@
 
 ## 2026-05-09 Security Patch
 
-- Fix rate limiting bypass: the 60-second cooldown was stored in the session cookie, so clearing cookies or using incognito bypassed it entirely. The Redis lock is now properly released on early aborts and wrapped in try/finally to guarantee release on exceptions.
+- Fix rate limiting bypass: the 60-second cooldown was stored in the session cookie, so clearing cookies or using incognito bypassed it entirely. Container action cooldowns are now enforced server-side in cache per user or team, and locks are released with try/finally on every path.
+- Fix team-mode quota/isolation bypass: in team mode, container lookup, create, renew, remove, and flag checks are now scoped to the team instead of the individual user so teammates cannot spawn parallel instances or bypass per-team limits.
+- Fix incomplete challenge access checks: container API requests now validate `challenge_id` as an integer, enforce CTF time/email decorators when available, require a team in team mode, and enforce challenge prerequisites before allowing instance access or creation.
+- Fix static flag bypass for dynamic Docker challenges: normal CTFd flags no longer override the per-container dynamic flag, preventing competitors from sharing one static flag across instances.
+- Fix container lifecycle races and orphaned services: the global lock now covers database record creation/removal, Docker service operations, and router reloads; containers have explicit `creating`, `running`, and `removing` states; router reloads only include active containers.
+- Fix max-container-count off-by-one: the configured maximum is now enforced with `>=` instead of allowing one extra container.
+- Fix unsafe cleanup sequencing: Docker service removal is attempted even when router unregister fails, failed removals remain tracked for retry, and direct-mode ports are returned to the pool only after the route is removed.
 - Fix race condition in FilesystemCacheProvider port/network allocation: concurrent requests could receive the same port, routing one competitor's traffic to another's container. All get/pop/set sequences are now protected by a threading lock, and per-user and global locks are properly implemented instead of no-op stubs.
 - Fix missing challenge type validation: competitors could request container creation for non-docker challenges, causing unhandled exceptions that destroyed their existing running container and leaked stack traces. The challenge_visible decorator now rejects non-docker challenges.
 - Fix timing side-channel on flag comparison: Python's `==` short-circuits on the first mismatched byte, leaking flag characters via response time differences. Flag comparison now uses `hmac.compare_digest()`.
 - Fix remaining time calculation: `timedelta.seconds` only returns the seconds component (0-86399), ignoring the days component. Replaced with `total_seconds()` to prevent expired containers from appearing valid.
 - Fix path traversal in admin template include: the `view_mode` query parameter was used directly in a Jinja2 `{% include %}` path with no validation. Now restricted to an allowlist of `list` and `card`.
+- Reduce template injection risk: Whale's configurable Jinja templates now render through a sandboxed environment, generated HTTP subdomains are strictly validated as DNS labels, and overlong generated flags are rejected.
+- Reduce frontend XSS risk: API error messages and LAN-domain values are escaped/rendered as text instead of raw HTML.
+- Add Docker service hardening defaults for new challenge services: init process enabled, `NET_RAW` dropped by default, log size/file limits added, restart condition defaults to `none`, and optional read-only root filesystem and run-as-user settings are exposed in the admin UI.
+- Harden the example FRP deployment: the sample `frpc` admin API no longer binds to `0.0.0.0`, uses a CTFd-only internal address, and replaces weak demo credentials with explicit placeholders.
 
 ## 2020-03-18
 

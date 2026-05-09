@@ -4,12 +4,12 @@ from flask import request
 from flask_restx import Namespace, Resource, abort
 
 from CTFd.utils import get_config
-from CTFd.utils import user as current_user
 from CTFd.utils.decorators import admins_only, authed_only
 
 from .decorators import challenge_visible, frequency_limited
 from .utils.control import ControlUtil
 from .utils.db import DBContainer
+from .utils.participants import get_current_actor
 from .utils.routers import Router
 
 admin_namespace = Namespace("ctfd-whale-admin")
@@ -69,20 +69,18 @@ class UserContainers(Resource):
     @authed_only
     @challenge_visible
     def get():
-        user_id = current_user.get_current_user().id
-        challenge_id = request.args.get('challenge_id')
-        container = DBContainer.get_current_containers(user_id=user_id)
+        user_id, team_id = get_current_actor()
+        challenge_id = request.args.get('challenge_id', type=int)
+        container = DBContainer.get_current_containers(user_id=user_id, team_id=team_id)
         if not container:
             return {'success': True, 'data': {}}
         timeout = int(get_config("whale:docker_timeout", "3600"))
-        c = container.challenge # build a url for quick jump. todo: escape dash in categories and names.
-        link = f'<a target="_blank" href="/challenges#{c.category}-{c.name}-{c.id}">{c.name}</a>'
         if int(container.challenge_id) != int(challenge_id):
-            return abort(403, f'Container already started but not from this challenge ({link})', success=False)
+            return abort(403, 'Container already started but not from this challenge', success=False)
         return {
             'success': True,
             'data': {
-                'lan_domain': str(user_id) + "-" + container.uuid,
+                'lan_domain': str(container.user_id) + "-" + container.uuid,
                 'user_access': Router.access(container),
                 'remaining_time': timeout - int((datetime.now() - container.start_time).total_seconds()),
             }
@@ -93,13 +91,14 @@ class UserContainers(Resource):
     @challenge_visible
     @frequency_limited
     def post():
-        user_id = current_user.get_current_user().id
-        ControlUtil.try_remove_container(user_id)
+        user_id, team_id = get_current_actor()
+        ControlUtil.try_remove_container(user_id=user_id, team_id=team_id)
 
-        challenge_id = request.args.get('challenge_id')
+        challenge_id = request.args.get('challenge_id', type=int)
         result, message = ControlUtil.try_add_container(
             user_id=user_id,
-            challenge_id=challenge_id
+            challenge_id=challenge_id,
+            team_id=team_id,
         )
         if not result:
             abort(403, message, success=False)
@@ -110,25 +109,25 @@ class UserContainers(Resource):
     @challenge_visible
     @frequency_limited
     def patch():
-        user_id = current_user.get_current_user().id
-        challenge_id = request.args.get('challenge_id')
+        user_id, team_id = get_current_actor()
+        challenge_id = request.args.get('challenge_id', type=int)
         docker_max_renew_count = int(get_config("whale:docker_max_renew_count", 5))
-        container = DBContainer.get_current_containers(user_id)
+        container = DBContainer.get_current_containers(user_id=user_id, team_id=team_id)
         if container is None:
             abort(403, 'Instance not found.', success=False)
         if int(container.challenge_id) != int(challenge_id):
             abort(403, f'Container started but not from this challenge（{container.challenge.name}）', success=False)
         if container.renew_count >= docker_max_renew_count:
             abort(403, 'Max renewal count exceed.', success=False)
-        result, message = ControlUtil.try_renew_container(user_id=user_id)
+        result, message = ControlUtil.try_renew_container(user_id=user_id, team_id=team_id)
         return {'success': result, 'message': message}
 
     @staticmethod
     @authed_only
     @frequency_limited
     def delete():
-        user_id = current_user.get_current_user().id
-        result, message = ControlUtil.try_remove_container(user_id)
+        user_id, team_id = get_current_actor()
+        result, message = ControlUtil.try_remove_container(user_id=user_id, team_id=team_id)
         if not result:
             abort(403, message, success=False)
         return {'success': True, 'message': message}

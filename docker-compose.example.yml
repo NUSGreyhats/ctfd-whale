@@ -67,14 +67,18 @@ services:
       "--server_addr=frps",
       "--server_port=7000",
       "--token=your_token",
-      "--admin_addr=0.0.0.0",
-      "--admin_port=7000",
-      "--admin_user=frank",
-      "--admin_pwd=qwer",
+      # Bind the admin API only to the CTFd/internal network address.
+      # Do NOT bind this to 0.0.0.0 because challenge containers share the
+      # containers network with frpc.
+      "--admin_addr=172.30.0.10",
+      "--admin_port=7400",
+      "--admin_user=change_me_user",
+      "--admin_pwd=change_me_password",
     ]
     networks:
       frp:
       internal:
+        ipv4_address: 172.30.0.10
       containers:
 
   frps:
@@ -97,6 +101,9 @@ networks:
     default:
     internal:
         internal: true
+        ipam:
+            config:
+                - subnet: 172.30.0.0/24
     frp:
         internal: true
     containers:

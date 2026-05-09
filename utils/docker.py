@@ -1,3 +1,4 @@
+import inspect
 import json
 import random
 import uuid
@@ -32,6 +33,69 @@ def get_docker_client():
 
 class DockerUtils:
     @staticmethod
+    def _config_bool(key, default=False):
+        val = get_config(key, default)
+        if isinstance(val, bool):
+            return val
+        return str(val).strip().lower() in ('1', 'true', 'yes', 'on')
+
+    @staticmethod
+    def _csv_config(key, default=''):
+        val = get_config(key, default) or ''
+        return [item.strip() for item in str(val).split(',') if item.strip()]
+
+    @staticmethod
+    def _key_value_config(key, default=''):
+        options = {}
+        for item in DockerUtils._csv_config(key, default):
+            if '=' in item:
+                k, v = item.split('=', 1)
+                options[k.strip()] = v.strip()
+        return options
+
+    @staticmethod
+    def service_hardening_kwargs():
+        """Security/resource defaults for challenge services.
+
+        The docker SDK changed ContainerSpec kwargs over time, so inspect the
+        installed SDK and only pass options it supports.
+        """
+        kwargs = {}
+        try:
+            spec_params = inspect.signature(docker.types.ContainerSpec.__init__).parameters
+        except Exception:
+            spec_params = {}
+
+        if 'init' in spec_params and DockerUtils._config_bool('whale:docker_enable_init', True):
+            kwargs['init'] = True
+
+        if 'read_only' in spec_params and DockerUtils._config_bool('whale:docker_read_only', False):
+            kwargs['read_only'] = True
+
+        user = get_config('whale:docker_user', '')
+        if 'user' in spec_params and user:
+            kwargs['user'] = user
+
+        cap_drop = DockerUtils._csv_config('whale:docker_cap_drop', 'NET_RAW')
+        if 'cap_drop' in spec_params and cap_drop:
+            kwargs['cap_drop'] = cap_drop
+
+        log_driver = get_config('whale:docker_log_driver', 'json-file')
+        if log_driver:
+            kwargs['log_driver'] = log_driver
+            log_options = DockerUtils._key_value_config(
+                'whale:docker_log_options', 'max-size=10m,max-file=3'
+            )
+            if log_options:
+                kwargs['log_driver_options'] = log_options
+
+        restart_condition = get_config('whale:docker_restart_condition', 'none')
+        if restart_condition:
+            kwargs['restart_policy'] = docker.types.RestartPolicy(condition=restart_condition)
+
+        return kwargs
+
+    @staticmethod
     def init():
         try:
             DockerUtils.client = get_docker_client()
@@ -58,7 +122,7 @@ class DockerUtils:
 
     @staticmethod
     def _create_standalone_container(container):
-        dns = get_config("whale:docker_dns", "").split(",")
+        dns = DockerUtils._csv_config("whale:docker_dns", "")
         node = DockerUtils.choose_node(
             container.challenge.docker_image,
             get_config("whale:docker_swarm_nodes", "").split(",")
@@ -78,7 +142,8 @@ class DockerUtils:
                 'whale_id': f'{container.user_id}-{container.uuid}'
             },  # for container deletion
             constraints=['node.labels.name==' + node],
-            endpoint_spec=docker.types.EndpointSpec(mode='dnsrr', ports={})
+            endpoint_spec=docker.types.EndpointSpec(mode='dnsrr', ports={}),
+            **DockerUtils.service_hardening_kwargs()
         )
 
     @staticmethod
@@ -143,7 +208,8 @@ class DockerUtils:
                         'whale_id': f'{container.user_id}-{container.uuid}'
                     },  # for container deletion
                     hostname=name, constraints=['node.labels.name==' + node],
-                    endpoint_spec=docker.types.EndpointSpec(mode='dnsrr', ports={})
+                    endpoint_spec=docker.types.EndpointSpec(mode='dnsrr', ports={}),
+                    **DockerUtils.service_hardening_kwargs()
                 )
         except Exception:
             whale_id = f'{container.user_id}-{container.uuid}'

@@ -2,16 +2,13 @@ import hmac
 
 from flask import Blueprint
 
-from CTFd.models import (
-    db,
-    Flags,
-)
+from CTFd.models import db
 from CTFd.plugins.challenges import BaseChallenge
 from CTFd.plugins.dynamic_challenges import DynamicValueChallenge
-from CTFd.plugins.flags import get_flag_class
-from CTFd.utils import user as current_user
 from .models import WhaleContainer, DynamicDockerChallenge
 from .utils.control import ControlUtil
+from .utils.db import DBContainer
+from .utils.participants import get_current_actor
 
 
 class DynamicValueDockerChallenge(BaseChallenge):
@@ -73,26 +70,14 @@ class DynamicValueDockerChallenge(BaseChallenge):
         data = request.form or request.get_json()
         submission = data["submission"].strip()
 
-        flags = Flags.query.filter_by(challenge_id=challenge.id).all()
+        user_id, team_id = get_current_actor()
+        container = DBContainer.get_current_containers(user_id=user_id, team_id=team_id)
+        if container is None or int(container.challenge_id) != int(challenge.id):
+            return False, "Please solve it during the container is running"
 
-        if len(flags) > 0:
-            for flag in flags:
-                if get_flag_class(flag.type).compare(flag, submission):
-                    return True, "Correct"
-            return False, "Incorrect"
-        else:
-            user_id = current_user.get_current_user().id
-            q = db.session.query(WhaleContainer)
-            q = q.filter(WhaleContainer.user_id == user_id)
-            q = q.filter(WhaleContainer.challenge_id == challenge.id)
-            records = q.all()
-            if len(records) == 0:
-                return False, "Please solve it during the container is running"
-
-            container = records[0]
-            if hmac.compare_digest(container.flag, submission):
-                return True, "Correct"
-            return False, "Incorrect"
+        if hmac.compare_digest(container.flag, submission):
+            return True, "Correct"
+        return False, "Incorrect"
 
     @classmethod
     def solve(cls, user, team, challenge, request):
