@@ -1,4 +1,5 @@
 import ipaddress
+import threading
 import warnings
 from CTFd.cache import cache
 from CTFd.utils import get_config
@@ -55,60 +56,86 @@ class CacheProvider:
 
 
 class FilesystemCacheProvider:
+    _lock = threading.Lock()
+    _user_locks = {}
+    _user_locks_guard = threading.Lock()
+    _global_lock = threading.Lock()
+
     def __init__(self, app, *args, **kwargs):
         warnings.warn(
             '\n[CTFd Whale] Warning: looks like you are using filesystem cache. '
             '\nThis is for TESTING purposes only, DO NOT USE on production sites.',
             RuntimeWarning
         )
-        self.key = 'ctfd_whale_lock-' + str(kwargs.get('user_id', 0))
+        self.user_id = kwargs.get('user_id', 0)
+        self.key = 'ctfd_whale_lock-' + str(self.user_id)
         self.global_port_key = "ctfd_whale-port-set"
         self.global_network_key = "ctfd_whale-network-set"
 
     def clear(self):
-        cache.set(self.global_port_key, set())
-        cache.set(self.global_network_key, set())
+        with self._lock:
+            cache.set(self.global_port_key, set())
+            cache.set(self.global_network_key, set())
 
     def add_available_network_range(self, *ranges):
-        s = cache.get(self.global_network_key)
-        s.update(ranges)
-        cache.set(self.global_network_key, s)
+        with self._lock:
+            s = cache.get(self.global_network_key)
+            s.update(ranges)
+            cache.set(self.global_network_key, s)
 
     def get_available_network_range(self):
-        try:
-            s = cache.get(self.global_network_key)
-            r = s.pop()
-            cache.set(self.global_network_key, s)
-            return r
-        except KeyError:
-            return None
+        with self._lock:
+            try:
+                s = cache.get(self.global_network_key)
+                r = s.pop()
+                cache.set(self.global_network_key, s)
+                return r
+            except KeyError:
+                return None
 
     def add_available_port(self, port):
-        s = cache.get(self.global_port_key)
-        s.add(port)
-        cache.set(self.global_port_key, s)
+        with self._lock:
+            s = cache.get(self.global_port_key)
+            s.add(port)
+            cache.set(self.global_port_key, s)
 
     def get_available_port(self):
-        try:
-            s = cache.get(self.global_port_key)
-            r = s.pop()
-            cache.set(self.global_port_key, s)
-            return r
-        except KeyError:
-            return None
+        with self._lock:
+            try:
+                s = cache.get(self.global_port_key)
+                r = s.pop()
+                cache.set(self.global_port_key, s)
+                return r
+            except KeyError:
+                return None
 
     def acquire_lock(self):
-        # for testing purposes only, so no need to set this limit
-        return True
+        with self._user_locks_guard:
+            if self.user_id not in self._user_locks:
+                self._user_locks[self.user_id] = threading.Lock()
+            lock = self._user_locks[self.user_id]
+        return lock.acquire(blocking=False)
 
     def release_lock(self):
-        return True
+        with self._user_locks_guard:
+            lock = self._user_locks.get(self.user_id)
+        if lock is None:
+            return False
+        try:
+            lock.release()
+            return True
+        except RuntimeError:
+            return False
 
     def acquire_global_lock(self):
-        return True
+        return self._global_lock.acquire(blocking=True, timeout=5.0)
 
     def release_global_lock(self):
-        return True
+        try:
+            self._global_lock.release()
+            return True
+        except RuntimeError:
+            return False
 
 
 class RedisCacheProvider(FlaskRedis):

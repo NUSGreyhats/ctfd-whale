@@ -6,6 +6,7 @@ from sqlalchemy.sql import and_
 
 from CTFd.models import Challenges
 from CTFd.utils.user import is_admin, get_current_user
+from .models import DynamicDockerChallenge
 from .utils.cache import CacheProvider
 
 
@@ -24,6 +25,8 @@ def challenge_visible(func):
                 and_(Challenges.state != "hidden", Challenges.state != "locked"),
             ).first():
                 abort(403, 'challenge not visible', success=False)
+        if not DynamicDockerChallenge.query.filter_by(id=challenge_id).first():
+            abort(400, 'challenge is not a docker challenge', success=False)
         return func(*args, **kwargs)
 
     return _challenge_visible
@@ -37,17 +40,19 @@ def frequency_limited(func):
         redis_util = CacheProvider(app=current_app, user_id=get_current_user().id)
         if not redis_util.acquire_lock():
             abort(403, 'Request Too Fast!', success=False)
-            # last request was unsuccessful. this is for protection.
 
         if "limit" not in session:
             session["limit"] = int(time.time())
         else:
             if int(time.time()) - session["limit"] < 60:
+                redis_util.release_lock()
                 abort(403, 'Frequency limit, You should wait at least 1 min.', success=False)
         session["limit"] = int(time.time())
 
-        result = func(*args, **kwargs)
-        redis_util.release_lock()  # if any exception is raised, lock will not be released
+        try:
+            result = func(*args, **kwargs)
+        finally:
+            redis_util.release_lock()
         return result
 
     return _frequency_limited

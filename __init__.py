@@ -84,6 +84,8 @@ def load(app):
     def admin_list_containers():
         result = AdminContainers.get()
         view_mode = request.args.get('mode', session.get('view_mode', 'list'))
+        if view_mode not in ('list', 'card'):
+            view_mode = 'list'
         session['view_mode'] = view_mode
         return render_template("whale_containers.html",
                                plugin_name=plugin_name,

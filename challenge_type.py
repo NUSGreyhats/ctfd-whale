@@ -1,3 +1,5 @@
+import hmac
+
 from flask import Blueprint
 
 from CTFd.models import (
@@ -88,7 +90,7 @@ class DynamicValueDockerChallenge(BaseChallenge):
                 return False, "Please solve it during the container is running"
 
             container = records[0]
-            if container.flag == submission:
+            if hmac.compare_digest(container.flag, submission):
                 return True, "Correct"
             return False, "Incorrect"
 
