@@ -26,9 +26,13 @@ def get_docker_client():
         return docker.DockerClient(
             base_url=get_config("whale:docker_api_url"),
             tls=tls_config,
+            version="auto",
         )
     else:
-        return docker.DockerClient(base_url=get_config("whale:docker_api_url"))
+        return docker.DockerClient(
+            base_url=get_config("whale:docker_api_url"),
+            version="auto",
+        )
 
 
 class DockerUtils:
