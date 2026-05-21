@@ -30,20 +30,19 @@ def _validate_subdomain(subdomain):
 
 
 def _get_challenge_flag_seed(challenge_id):
-    flag = Flags.query.filter_by(challenge_id=challenge_id).order_by(Flags.id.asc()).first()
-    if flag is None:
-        raise WhaleError("Dynamic Docker challenges require a static CTFd flag containing UUID")
+    flags = Flags.query.filter_by(challenge_id=challenge_id).order_by(Flags.id.asc()).all()
+    for flag in flags:
+        flag_type = (getattr(flag, "type", None) or "static").strip().lower()
+        if flag_type != "static":
+            continue
 
-    flag_type = (getattr(flag, "type", None) or "static").strip().lower()
-    if flag_type != "static":
-        raise WhaleError("Dynamic Docker challenges require a static CTFd flag containing UUID")
+        content = (flag.content or "").strip()
+        if content and "UUID" in content:
+            return content
 
-    content = (flag.content or "").strip()
-    if not content:
+    if flags:
         raise WhaleError("Dynamic Docker challenges require a static CTFd flag containing UUID")
-    if "UUID" not in content:
-        raise WhaleError("Dynamic Docker challenge flags must include the UUID placeholder")
-    return content
+    raise WhaleError("Dynamic Docker challenges require at least one static CTFd flag containing UUID")
 
 
 def _build_instance_flag(seed, suffix):
@@ -136,7 +135,7 @@ class WhaleContainer(db.Model):
         flag_seed = _get_challenge_flag_seed(challenge_id)
         self.flag = _build_instance_flag(flag_seed, self.uuid)
         if len(self.flag) > 128:
-            raise WhaleError('Rendered flag is too long (maximum 128 characters)')
+            raise WhaleError('Generated flag is too long (maximum 128 characters)')
 
     @property
     def user_access(self):

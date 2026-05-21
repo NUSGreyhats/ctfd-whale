@@ -17,14 +17,12 @@
     {% endfor %}
 
     <div class="form-group">
-        <label>
-            Flag Template
-            <small class="form-text text-muted">
-                Dynamic Docker challenges must define a static CTFd flag containing the literal
-                <code>UUID</code> placeholder, for example <code>grey{example_UUID}</code>.
-                Whale replaces <code>UUID</code> with the instance UUID when creating a container.
-            </small>
-        </label>
+        <p class="mb-1 font-weight-bold">Flag Template</p>
+        <p class="form-text text-muted mb-0">
+            Dynamic Docker challenges must define a static CTFd flag containing the literal
+            <code>UUID</code> placeholder, for example <code>grey{example_UUID}</code>.
+            Whale replaces <code>UUID</code> with the instance UUID when creating a container.
+        </p>
     </div>
 
     <div class="submit-row float-right">
