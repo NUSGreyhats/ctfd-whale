@@ -1,7 +1,6 @@
 <div class="tab-pane fade" id="challenges" role="tabpanel">
     {% for config, val in {
         "Subdomain Template": ("template_http_subdomain", "Controls how the subdomain of a container is generated"),
-        "Flag Template": ("template_chall_flag", "Controls how a flag is generated"),
     }.items() %}
         {% set value = get_config('whale:' + val[0]) %}
         <div class="form-group">
@@ -16,6 +15,15 @@
                    {% if value != None %}value="{{ value }}"{% endif %}>
         </div>
     {% endfor %}
+
+    <div class="form-group">
+        <p class="mb-1 font-weight-bold">Flag Template</p>
+        <p class="form-text text-muted mb-0">
+            Dynamic Docker challenges must define a static CTFd flag containing the literal
+            <code>UUID</code> placeholder, for example <code>grey{example_UUID}</code>.
+            Whale replaces <code>UUID</code> with the instance UUID when creating a container.
+        </p>
+    </div>
 
     <div class="submit-row float-right">
         <button type="submit" tabindex="0" class="btn btn-md btn-primary btn-outlined">
