@@ -29,7 +29,6 @@ def setup_default_configs():
         'frp_direct_port_maximum': '10100',
         'frp_direct_port_minimum': '10000',
         'template_http_subdomain': '{{ container.uuid }}',
-        'template_chall_flag': '{{ "flag{"+uuid.uuid4()|string+"}" }}',
     }.items():
         set_config('whale:' + key, val)
     db.session.add(WhaleRedirectTemplate(

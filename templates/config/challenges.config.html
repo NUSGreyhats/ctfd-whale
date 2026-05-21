@@ -1,7 +1,6 @@
 <div class="tab-pane fade" id="challenges" role="tabpanel">
     {% for config, val in {
         "Subdomain Template": ("template_http_subdomain", "Controls how the subdomain of a container is generated"),
-        "Flag Template": ("template_chall_flag", "Controls how a flag is generated"),
     }.items() %}
         {% set value = get_config('whale:' + val[0]) %}
         <div class="form-group">

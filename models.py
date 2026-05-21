@@ -1,4 +1,3 @@
-import random
 import re
 import uuid
 from datetime import datetime
@@ -6,7 +5,7 @@ from datetime import datetime
 from jinja2.sandbox import SandboxedEnvironment
 
 from CTFd.utils import get_config
-from CTFd.models import db
+from CTFd.models import Flags, db
 from CTFd.plugins.dynamic_challenges import DynamicChallenge
 
 from .utils.exceptions import WhaleError
@@ -28,6 +27,29 @@ def _validate_subdomain(subdomain):
             "it must be 1-63 characters and must not start or end with a dash."
         )
     return subdomain
+
+
+def _get_challenge_flag_seed(challenge_id):
+    flag = Flags.query.filter_by(challenge_id=challenge_id).order_by(Flags.id.asc()).first()
+    if flag is None:
+        raise WhaleError("Dynamic Docker challenges require a static CTFd flag containing UUID")
+
+    flag_type = (getattr(flag, "type", None) or "static").strip().lower()
+    if flag_type != "static":
+        raise WhaleError("Dynamic Docker challenges require a static CTFd flag containing UUID")
+
+    content = (flag.content or "").strip()
+    if not content:
+        raise WhaleError("Dynamic Docker challenges require a static CTFd flag containing UUID")
+    if "UUID" not in content:
+        raise WhaleError("Dynamic Docker challenge flags must include the UUID placeholder")
+    return content
+
+
+def _build_instance_flag(seed, suffix):
+    if "UUID" not in seed:
+        raise WhaleError("Dynamic Docker challenge flags must include the UUID placeholder")
+    return seed.replace("UUID", suffix)
 
 
 class WhaleConfig(db.Model):
@@ -111,9 +133,8 @@ class WhaleContainer(db.Model):
         self.renew_count = 0
         self.status = self.STATUS_CREATING
         self.uuid = str(uuid.uuid4())
-        self.flag = _render_template(get_config(
-            'whale:template_chall_flag', '{{ "flag{"+uuid.uuid4()|string+"}" }}'
-        ), container=self, uuid=uuid, random=random, get_config=get_config).strip()
+        flag_seed = _get_challenge_flag_seed(challenge_id)
+        self.flag = _build_instance_flag(flag_seed, self.uuid)
         if len(self.flag) > 128:
             raise WhaleError('Rendered flag is too long (maximum 128 characters)')
 

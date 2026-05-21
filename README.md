@@ -9,7 +9,7 @@ A plugin that empowers CTFd to bring up separate environments for each user
 - Deploys containers with `frp` and `docker swarm`
 - Supports subdomain access by utilizing `frp`
 - Contestants can start/renew/destroy their environments with a single click
-- flags and subdomains are generated automatically with configurable rules
+- subdomains are generated automatically with configurable rules
 - Administrators can get a full list of running containers, with full control over them.
 
 ## Installation & Usage
