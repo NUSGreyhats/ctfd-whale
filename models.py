@@ -67,7 +67,7 @@ class DynamicDockerChallenge(DynamicChallenge):
     dynamic_score = db.Column(db.Integer, default=0)
 
     docker_image = db.Column(db.Text, default=0)
-    redirect_type = db.Column(db.Text, default=0)
+    redirect_type = db.Column(db.Text, default="http")
     redirect_port = db.Column(db.Integer, default=0)
 
     def __init__(self, *args, **kwargs):
