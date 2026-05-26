@@ -25,10 +25,6 @@ function cleanupWhaleTimers() {
         clearInterval(window.t);
         window.t = undefined;
     }
-    if (window.whaleReadyPoll !== undefined) {
-        clearTimeout(window.whaleReadyPoll);
-        window.whaleReadyPoll = undefined;
-    }
     window.whaleLoadToken = (window.whaleLoadToken || 0) + 1;
 }
 
@@ -46,11 +42,6 @@ function loadInfo() {
     var url = "/api/v1/plugins/ctfd-whale/container?challenge_id=" + challenge_id;
     var loadToken = (window.whaleLoadToken || 0) + 1;
     window.whaleLoadToken = loadToken;
-
-    if (window.whaleReadyPoll !== undefined) {
-        clearTimeout(window.whaleReadyPoll);
-        window.whaleReadyPoll = undefined;
-    }
 
     CTFd.fetch(url, {
         method: 'GET',
@@ -91,23 +82,11 @@ function loadInfo() {
             button: "OK"
         });
         if (response.remaining_time != undefined) {
-            $('#whale-challenge-lan-domain').text(response.lan_domain);
             $('#whale-challenge-count-down').text(response.remaining_time);
             $('#whale-panel-stopped').hide();
             $('#whale-panel-started').show();
-
-            if (response.ready === true) {
-                $('#whale-challenge-status').hide();
-                $('#whale-challenge-user-access').html(response.user_access);
-                $('#whale-challenge-ready-controls').show();
-            } else {
-                $('#whale-challenge-status')
-                    .text(response.message || "Instance is starting. The link will appear once it is ready.")
-                    .show();
-                $('#whale-challenge-user-access').empty();
-                $('#whale-challenge-ready-controls').hide();
-                window.whaleReadyPoll = setTimeout(loadInfo, 2000);
-            }
+            $('#whale-challenge-user-access').html(response.user_access);
+            $('#whale-challenge-ready-controls').show();
 
             window.t = setInterval(() => {
                 const c = $('#whale-challenge-count-down').text();
@@ -119,7 +98,6 @@ function loadInfo() {
                 $('#whale-challenge-count-down').text(second);
             }, 1000);
         } else {
-            $('#whale-challenge-status').hide();
             $('#whale-challenge-ready-controls').hide();
             $('#whale-panel-started').hide();
             $('#whale-panel-stopped').show();
@@ -253,11 +231,6 @@ CTFd._internal.challenge.boot = function () {
     }).then(function (response) {
         if (response.success) {
             loadInfo();
-            CTFd._functions.events.eventAlert({
-                title: "Success",
-                html: "Your instance is starting. The link will appear once it is ready.",
-                button: "OK"
-            });
         } else {
             CTFd._functions.events.eventAlert({
                 title: "Fail",
