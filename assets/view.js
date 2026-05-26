@@ -82,7 +82,6 @@ function loadInfo() {
             button: "OK"
         });
         if (response.remaining_time != undefined) {
-            $('#whale-challenge-lan-domain').text(response.lan_domain);
             $('#whale-challenge-count-down').text(response.remaining_time);
             $('#whale-panel-stopped').hide();
             $('#whale-panel-started').show();
@@ -232,11 +231,6 @@ CTFd._internal.challenge.boot = function () {
     }).then(function (response) {
         if (response.success) {
             loadInfo();
-            CTFd._functions.events.eventAlert({
-                title: "Success",
-                html: "Your instance has been deployed. Challenges may take up to 30s to start.",
-                button: "OK"
-            });
         } else {
             CTFd._functions.events.eventAlert({
                 title: "Fail",
