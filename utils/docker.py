@@ -58,6 +58,31 @@ class DockerUtils:
         return options
 
     @staticmethod
+    def _challenge_extra_networks(challenge):
+        raw = getattr(challenge, 'extra_networks', '') or ''
+        if isinstance(raw, (list, tuple)):
+            networks = raw
+        else:
+            raw = str(raw).strip()
+            if not raw:
+                return []
+            try:
+                parsed = json.loads(raw)
+                networks = parsed if isinstance(parsed, list) else [parsed]
+            except json.JSONDecodeError:
+                networks = raw.replace('\n', ',').split(',')
+
+        return [str(network).strip() for network in networks if str(network).strip()]
+
+    @staticmethod
+    def _standalone_networks(challenge):
+        networks = [get_config("whale:docker_auto_connect_network", "ctfd_frp-containers")]
+        for network in DockerUtils._challenge_extra_networks(challenge):
+            if network not in networks:
+                networks.append(network)
+        return networks
+
+    @staticmethod
     def service_hardening_kwargs():
         """Security/resource defaults for challenge services.
 
@@ -136,7 +161,7 @@ class DockerUtils:
             image=container.challenge.docker_image,
             name=f'{container.user_id}-{container.uuid}',
             env={'FLAG': container.flag}, dns_config=docker.types.DNSConfig(nameservers=dns),
-            networks=[get_config("whale:docker_auto_connect_network", "ctfd_frp-containers")],
+            networks=DockerUtils._standalone_networks(container.challenge),
             resources=docker.types.Resources(
                 mem_limit=DockerUtils.convert_readable_text(
                     container.challenge.memory_limit),

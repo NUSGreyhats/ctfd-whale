@@ -90,6 +90,7 @@ class DynamicDockerChallenge(DynamicChallenge):
     docker_image = db.Column(db.Text, default=0)
     redirect_type = db.Column(db.Text, default="http")
     redirect_port = db.Column(db.Integer, default=0)
+    extra_networks = db.Column(db.Text, default="")
 
     def __init__(self, *args, **kwargs):
         kwargs["initial"] = kwargs["value"]

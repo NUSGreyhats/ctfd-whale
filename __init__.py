@@ -4,6 +4,7 @@ import warnings
 import requests
 from flask import Blueprint, render_template, session, current_app, request
 from flask_apscheduler import APScheduler
+from sqlalchemy import inspect, text
 
 from CTFd.api import CTFd_API_v1
 from CTFd.plugins import (
@@ -25,12 +26,23 @@ from .utils.setup import setup_default_configs
 from .utils.routers import Router
 
 
+def ensure_schema(app):
+    inspector = inspect(app.db.engine)
+    columns = {column["name"] for column in inspector.get_columns("dynamic_docker_challenge")}
+    if "extra_networks" not in columns:
+        app.db.session.execute(
+            text("alter table dynamic_docker_challenge add column extra_networks text")
+        )
+        app.db.session.commit()
+
+
 def load(app):
     app.config['RESTX_ERROR_404_HELP'] = False
     # upgrade()
     plugin_name = __name__.split('.')[-1]
     set_config('whale:plugin_name', plugin_name)
     app.db.create_all()
+    ensure_schema(app)
     if not get_config("whale:setup"):
         setup_default_configs()
 
