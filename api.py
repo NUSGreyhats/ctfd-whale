@@ -3,7 +3,7 @@ import re
 
 from flask import request
 from flask_restx import Namespace, Resource, abort
-from requests import RequestException, get
+from requests import RequestException, get, head
 
 from CTFd.utils import get_config
 from CTFd.utils.decorators import admins_only, authed_only
@@ -32,10 +32,17 @@ def _container_ready(container):
         return False
 
     try:
+        response = head(url, timeout=2.0, allow_redirects=False)
+        if response.status_code not in (405, 501):
+            return _ready_status(response.status_code)
         with get(url, timeout=2.0, allow_redirects=False, stream=True) as response:
-            return response.status_code < 500 and response.status_code != 404
+            return _ready_status(response.status_code)
     except RequestException:
         return False
+
+
+def _ready_status(status_code):
+    return status_code < 500 and status_code != 404
 
 
 @admin_namespace.errorhandler
