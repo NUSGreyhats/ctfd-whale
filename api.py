@@ -31,18 +31,32 @@ def _container_ready(container):
     if not url:
         return False
 
+    ready = _probe_http_ready(url)
+    if ready is not None:
+        return ready
+
+    return _readiness_probe_expired(container)
+
+
+def _probe_http_ready(url):
     try:
         response = head(url, timeout=2.0, allow_redirects=False)
-        if response.status_code not in (405, 501):
-            return _ready_status(response.status_code)
+        if _ready_status(response.status_code):
+            return True
         with get(url, timeout=2.0, allow_redirects=False, stream=True) as response:
             return _ready_status(response.status_code)
     except RequestException:
-        return False
+        return None
 
 
 def _ready_status(status_code):
     return status_code < 500 and status_code != 404
+
+
+def _readiness_probe_expired(container):
+    fail_open_seconds = int(get_config("whale:readiness_probe_fail_open_seconds", "10"))
+    age = (datetime.now() - container.start_time).total_seconds()
+    return age >= fail_open_seconds
 
 
 @admin_namespace.errorhandler
