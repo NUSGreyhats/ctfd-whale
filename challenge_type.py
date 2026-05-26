@@ -1,4 +1,5 @@
 import hmac
+import json
 
 from flask import Blueprint
 
@@ -57,6 +58,8 @@ class DynamicValueDockerChallenge(BaseChallenge):
                 value = float(value)
             if attr == 'dynamic_score':
                 value = int(value)
+            if attr == 'extra_networks' and isinstance(value, (list, tuple)):
+                value = json.dumps([str(item).strip() for item in value if str(item).strip()])
             setattr(challenge, attr, value)
 
         if challenge.dynamic_score == 1:

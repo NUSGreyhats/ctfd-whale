@@ -81,6 +81,15 @@
                value="{{ challenge.cpu_limit }}" required>
     </div>
     <div class="form-group">
+        <label for="value">Extra Docker Networks<br>
+            <small class="form-text text-muted">
+                Optional comma-separated external networks to attach standalone instances to
+            </small>
+        </label>
+        <input type="text" class="form-control" name="extra_networks" placeholder="network-a,network-b"
+               value="{{ challenge.extra_networks or '' }}">
+    </div>
+    <div class="form-group">
         <label for="value">Score Type<br>
             <small class="form-text text-muted">
                 Decide it use dynamic score or not
