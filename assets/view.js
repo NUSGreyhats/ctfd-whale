@@ -3,11 +3,13 @@ CTFd._internal.challenge.data = undefined
 CTFd._internal.challenge.renderer = null;
 
 CTFd._internal.challenge.preRender = function () {
+    cleanupWhaleTimers();
 }
 
 CTFd._internal.challenge.render = null;
 
 CTFd._internal.challenge.postRender = function () {
+    bindWhaleModalCleanup();
     loadInfo();
 }
 
@@ -18,9 +20,32 @@ function htmlentities(str) {
         .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+function cleanupWhaleTimers() {
+    if (window.t !== undefined) {
+        clearInterval(window.t);
+        window.t = undefined;
+    }
+    if (window.whaleReadyPoll !== undefined) {
+        clearTimeout(window.whaleReadyPoll);
+        window.whaleReadyPoll = undefined;
+    }
+    window.whaleLoadToken = (window.whaleLoadToken || 0) + 1;
+}
+
+function bindWhaleModalCleanup() {
+    var challengeWindow = document.getElementById("challenge-window");
+    if (challengeWindow === null || challengeWindow.dataset.whaleCleanupBound === "true") {
+        return;
+    }
+    challengeWindow.dataset.whaleCleanupBound = "true";
+    challengeWindow.addEventListener("hidden.bs.modal", cleanupWhaleTimers);
+}
+
 function loadInfo() {
     var challenge_id = CTFd._internal.challenge.data.id;
     var url = "/api/v1/plugins/ctfd-whale/container?challenge_id=" + challenge_id;
+    var loadToken = (window.whaleLoadToken || 0) + 1;
+    window.whaleLoadToken = loadToken;
 
     if (window.whaleReadyPoll !== undefined) {
         clearTimeout(window.whaleReadyPoll);
@@ -45,6 +70,16 @@ function loadInfo() {
         }
         return response.json();
     }).then(function (response) {
+        if (window.whaleLoadToken !== loadToken) {
+            return;
+        }
+        if (
+            CTFd._internal.challenge.data === undefined ||
+            CTFd._internal.challenge.data.id !== challenge_id ||
+            $('#whale-panel').length === 0
+        ) {
+            return;
+        }
         if (window.t !== undefined) {
             clearInterval(window.t);
             window.t = undefined;
