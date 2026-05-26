@@ -1,7 +1,9 @@
 from datetime import datetime
+import re
 
 from flask import request
 from flask_restx import Namespace, Resource, abort
+from requests import RequestException, get
 
 from CTFd.utils import get_config
 from CTFd.utils.decorators import admins_only, authed_only
@@ -14,6 +16,27 @@ from .utils.routers import Router
 
 admin_namespace = Namespace("ctfd-whale-admin")
 user_namespace = Namespace("ctfd-whale-user")
+
+
+def _extract_http_url(access):
+    match = re.search(r'https?://[^"\'<>\s]+', access or '')
+    return match.group(0) if match else ''
+
+
+def _container_ready(container):
+    if container.challenge.redirect_type != 'http':
+        return True
+
+    url = _extract_http_url(Router.access(container))
+    if not url:
+        return False
+
+    try:
+        response = get(url, timeout=2.0, allow_redirects=True)
+    except RequestException:
+        return False
+
+    return response.status_code < 500 and response.status_code != 404
 
 
 @admin_namespace.errorhandler
@@ -77,13 +100,19 @@ class UserContainers(Resource):
         timeout = int(get_config("whale:docker_timeout", "3600"))
         if int(container.challenge_id) != int(challenge_id):
             return abort(403, 'Container already started but not from this challenge', success=False)
+        ready = _container_ready(container)
+        data = {
+            'lan_domain': str(container.user_id) + "-" + container.uuid,
+            'ready': ready,
+            'remaining_time': timeout - int((datetime.now() - container.start_time).total_seconds()),
+        }
+        if ready:
+            data['user_access'] = Router.access(container)
+        else:
+            data['message'] = 'Instance is starting. The link will appear once it is ready.'
         return {
             'success': True,
-            'data': {
-                'lan_domain': str(container.user_id) + "-" + container.uuid,
-                'user_access': Router.access(container),
-                'remaining_time': timeout - int((datetime.now() - container.start_time).total_seconds()),
-            }
+            'data': data
         }
 
     @staticmethod

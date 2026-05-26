@@ -22,6 +22,11 @@ function loadInfo() {
     var challenge_id = CTFd._internal.challenge.data.id;
     var url = "/api/v1/plugins/ctfd-whale/container?challenge_id=" + challenge_id;
 
+    if (window.whaleReadyPoll !== undefined) {
+        clearTimeout(window.whaleReadyPoll);
+        window.whaleReadyPoll = undefined;
+    }
+
     CTFd.fetch(url, {
         method: 'GET',
         credentials: 'same-origin',
@@ -51,11 +56,23 @@ function loadInfo() {
             button: "OK"
         });
         if (response.remaining_time != undefined) {
-            $('#whale-challenge-user-access').html(response.user_access);
             $('#whale-challenge-lan-domain').text(response.lan_domain);
             $('#whale-challenge-count-down').text(response.remaining_time);
             $('#whale-panel-stopped').hide();
             $('#whale-panel-started').show();
+
+            if (response.ready === true) {
+                $('#whale-challenge-status').hide();
+                $('#whale-challenge-user-access').html(response.user_access);
+                $('#whale-challenge-ready-controls').show();
+            } else {
+                $('#whale-challenge-status')
+                    .text(response.message || "Instance is starting. The link will appear once it is ready.")
+                    .show();
+                $('#whale-challenge-user-access').empty();
+                $('#whale-challenge-ready-controls').hide();
+                window.whaleReadyPoll = setTimeout(loadInfo, 2000);
+            }
 
             window.t = setInterval(() => {
                 const c = $('#whale-challenge-count-down').text();
@@ -67,6 +84,8 @@ function loadInfo() {
                 $('#whale-challenge-count-down').text(second);
             }, 1000);
         } else {
+            $('#whale-challenge-status').hide();
+            $('#whale-challenge-ready-controls').hide();
             $('#whale-panel-started').hide();
             $('#whale-panel-stopped').show();
         }
@@ -201,7 +220,7 @@ CTFd._internal.challenge.boot = function () {
             loadInfo();
             CTFd._functions.events.eventAlert({
                 title: "Success",
-                html: "Your instance has been deployed!",
+                html: "Your instance is starting. The link will appear once it is ready.",
                 button: "OK"
             });
         } else {
