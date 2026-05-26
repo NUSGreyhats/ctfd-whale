@@ -32,11 +32,10 @@ def _container_ready(container):
         return False
 
     try:
-        response = get(url, timeout=2.0, allow_redirects=True)
+        with get(url, timeout=2.0, allow_redirects=False, stream=True) as response:
+            return response.status_code < 500 and response.status_code != 404
     except RequestException:
         return False
-
-    return response.status_code < 500 and response.status_code != 404
 
 
 @admin_namespace.errorhandler
