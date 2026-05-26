@@ -23,14 +23,18 @@
                     <p id="whale-challenge-status" class="card-text text-muted"></p>
                     <div id="whale-challenge-ready-controls" style="display: none;">
                         <p id="whale-challenge-user-access" class="card-text"></p>
-                        <button type="button" class="btn btn-danger card-link" id="whale-button-destroy"
-                                onclick="CTFd._internal.challenge.destroy()">
-                            Destroy this instance
-                        </button>
-                        <button type="button" class="btn btn-success card-link" id="whale-button-renew"
-                                onclick="CTFd._internal.challenge.renew()">
-                            Renew this instance
-                        </button>
+                        <div class="d-flex flex-column align-items-center">
+                            <button type="button" class="btn btn-danger mb-2" id="whale-button-destroy"
+                                    style="min-width: 18rem; max-width: 100%;"
+                                    onclick="CTFd._internal.challenge.destroy()">
+                                Destroy this instance
+                            </button>
+                            <button type="button" class="btn btn-success" id="whale-button-renew"
+                                    style="min-width: 18rem; max-width: 100%;"
+                                    onclick="CTFd._internal.challenge.renew()">
+                                Renew this instance
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
