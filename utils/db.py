@@ -40,17 +40,21 @@ class DBContainer:
         db.session.commit()
 
     @staticmethod
-    def get_current_containers(user_id=None, team_id=None, include_inactive=False):
+    def get_current_containers(user_id=None, team_id=None, challenge_id=None, include_inactive=False):
         q = db.session.query(WhaleContainer)
         q = DBContainer._apply_actor_filter(q, user_id=user_id, team_id=team_id)
+        if challenge_id is not None:
+            q = q.filter(WhaleContainer.challenge_id == challenge_id)
         if not include_inactive:
             q = q.filter(WhaleContainer.status == WhaleContainer.STATUS_RUNNING)
         return q.order_by(WhaleContainer.start_time.desc()).first()
 
     @staticmethod
-    def get_current_containers_list(user_id=None, team_id=None, include_inactive=False):
+    def get_current_containers_list(user_id=None, team_id=None, challenge_id=None, include_inactive=False):
         q = db.session.query(WhaleContainer)
         q = DBContainer._apply_actor_filter(q, user_id=user_id, team_id=team_id)
+        if challenge_id is not None:
+            q = q.filter(WhaleContainer.challenge_id == challenge_id)
         if not include_inactive:
             q = q.filter(WhaleContainer.status == WhaleContainer.STATUS_RUNNING)
         return q.order_by(WhaleContainer.start_time.desc()).all()
@@ -63,6 +67,12 @@ class DBContainer:
             WhaleContainer.status == WhaleContainer.STATUS_RUNNING,
         )
         return q.first()
+
+    @staticmethod
+    def get_container_by_id(container_id):
+        return db.session.query(WhaleContainer).filter(
+            WhaleContainer.id == container_id
+        ).first()
 
     @staticmethod
     def remove_container_record(user_id=None, team_id=None, container_ids=None):

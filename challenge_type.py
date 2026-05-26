@@ -74,9 +74,13 @@ class DynamicValueDockerChallenge(BaseChallenge):
         submission = data["submission"].strip()
 
         user_id, team_id = get_current_actor()
-        container = DBContainer.get_current_containers(user_id=user_id, team_id=team_id)
-        if container is None or int(container.challenge_id) != int(challenge.id):
-            return False, "Please solve it during the container is running"
+        container = DBContainer.get_current_containers(
+            user_id=user_id,
+            team_id=team_id,
+            challenge_id=challenge.id,
+        )
+        if container is None:
+            return False, "Please solve it while the container is running"
 
         if hmac.compare_digest(container.flag, submission):
             return True, "Correct"
@@ -94,5 +98,8 @@ class DynamicValueDockerChallenge(BaseChallenge):
         for container in WhaleContainer.query.filter_by(
             challenge_id=challenge.id
         ).all():
-            ControlUtil.try_remove_container(container.user_id)
+            ControlUtil.try_remove_container(
+                container.user_id,
+                challenge_id=challenge.id,
+            )
         super().delete(challenge)
