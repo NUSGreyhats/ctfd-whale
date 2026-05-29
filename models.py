@@ -45,10 +45,10 @@ def _get_challenge_flag_seed(challenge_id):
     raise WhaleError("Dynamic Docker challenges require at least one static CTFd flag containing UUID")
 
 
-def _build_instance_flag(seed, suffix):
+def _build_instance_flag(seed):
     if "UUID" not in seed:
         raise WhaleError("Dynamic Docker challenge flags must include the UUID placeholder")
-    return seed.replace("UUID", suffix)
+    return seed.replace("UUID", str(uuid.uuid4()))
 
 
 class WhaleConfig(db.Model):
@@ -134,7 +134,7 @@ class WhaleContainer(db.Model):
         self.status = self.STATUS_CREATING
         self.uuid = str(uuid.uuid4())
         flag_seed = _get_challenge_flag_seed(challenge_id)
-        self.flag = _build_instance_flag(flag_seed, self.uuid)
+        self.flag = _build_instance_flag(flag_seed)
         if len(self.flag) > 128:
             raise WhaleError('Generated flag is too long (maximum 128 characters)')
 
